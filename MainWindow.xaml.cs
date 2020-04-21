@@ -45,15 +45,21 @@ namespace WPFBatteryAndTouchscreenTool
         private void Init()
         {
             string status = "undefined";
+            try
+            {
+                PowerShell s = PowerShell.Create();
+                s.AddScript("Get-PnpDevice | Where-Object {$_.FriendlyName -like '*HID-konformer Touchscreen*'} | Select-Object Status -first 1");
+                Collection<PSObject> c = s.Invoke();
+                if (c.Count > 0)
+                    status = c[0].Properties["Status"].Value.ToString();
+                s.Dispose();
+            }
+            catch(Exception)
+            {
+                status = "undefined";
+            }
 
-            PowerShell s = PowerShell.Create();
-            s.AddScript("Get-PnpDevice | Where-Object {$_.FriendlyName -like '*HID-konformer Touchscreen*'} | Select-Object Status -first 1");
-            Collection<PSObject> c = s.Invoke();
-            if(c.Count > 0)
-                status = c[0].Properties["Status"].Value.ToString();
-            s.Dispose();
-
-            if(status == "undefined")
+            if (status == "undefined")
             {
                 _noTouchScreen = true;
             }
@@ -105,26 +111,31 @@ namespace WPFBatteryAndTouchscreenTool
 
         private void UpdateIcon()
         {
-            ObjectQuery query = new ObjectQuery("Select EstimatedChargeRemaining, EstimatedRunTime FROM Win32_Battery");
-            ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
-
             int percentage = -1;
             int remaining = -1;
-            
-            ManagementObjectCollection collection = searcher.Get();
-            foreach (ManagementObject mo in collection)
+
+            try
             {
-                try
+                ObjectQuery query = new ObjectQuery("Select EstimatedChargeRemaining, EstimatedRunTime FROM Win32_Battery");
+                ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
+
+
+
+                ManagementObjectCollection collection = searcher.Get();
+                foreach (ManagementObject mo in collection)
                 {
+
                     percentage = Convert.ToInt32(mo.Properties["EstimatedChargeRemaining"].Value.ToString());
                     remaining = Convert.ToInt32(mo.Properties["EstimatedRunTime"].Value.ToString());
-                }
-                catch(InvalidCastException)
-                {
+
                     break;
                 }
             }
-
+            catch (InvalidCastException)
+            {
+                
+            }
+        
             _percentage = percentage >= 0 ? percentage : 100;
             _remaining = remaining;
             
@@ -144,7 +155,7 @@ namespace WPFBatteryAndTouchscreenTool
             System.Drawing.Rectangle rect = new System.Drawing.Rectangle(0, 0, 32, 32);
             g.FillRectangle(System.Drawing.Brushes.Transparent, rect);
 
-            g.DrawString(percentage < 100 ? percentage + "" : "TOP" , _font, System.Drawing.Brushes.White, rect, _format);
+            g.DrawString(percentage < 100 ? percentage + "" : "OK" , _font, System.Drawing.Brushes.White, rect, _format);
 
             return icon;
         }
