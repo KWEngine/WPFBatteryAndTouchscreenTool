@@ -5,7 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:WPFBatteryAndTouchscreenTool"
         mc:Ignorable="d"
-        Title="BatteryToolKarau" Height="450" Width="800" Background="Black" ShowInTaskbar="False" ResizeMode="NoResize" Icon="percentage.ico" Visibility="Hidden">
+        Title="BatteryToolKarau" Height="450" Width="800" Background="Black" ShowInTaskbar="False" ResizeMode="NoResize" Icon="percentage.ico" Visibility="Hidden"
+        Closing="Window_Closing">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition/>

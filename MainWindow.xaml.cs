@@ -31,14 +31,17 @@ namespace WPFBatteryAndTouchscreenTool
         private Timer _timer = new Timer();
         private Font _font = new Font("Calibri", 17f, System.Drawing.FontStyle.Bold);
         private StringFormat _format = new StringFormat();
-        private int _percentage = -1;
+        private float _percentage = -1;
         private int _remaining = -1;
         private bool _touchscreenEnabled = true;
         private bool _noTouchScreen = false;
 
+        private LoggerSimple _logger;
+
         public MainWindow()
         {
             InitializeComponent();
+            _logger = new LoggerSimple("log.txt");
             Init();
         }
 
@@ -54,8 +57,9 @@ namespace WPFBatteryAndTouchscreenTool
                     status = c[0].Properties["Status"].Value.ToString();
                 s.Dispose();
             }
-            catch(Exception)
+            catch(Exception ex)
             {
+                _logger.Log("Init() - " + ex.Message, LoggerSimple.LogLevel.Error);
                 status = "undefined";
             }
 
@@ -91,16 +95,23 @@ namespace WPFBatteryAndTouchscreenTool
         {
             if (!_noTouchScreen)
             {
-                PowerShell s = PowerShell.Create();
-                if (_touchscreenEnabled)
-                    s.AddScript("Get-PnpDevice | Where-Object {$_.FriendlyName -like '*HID-konformer Touchscreen*'} | Disable-PnpDevice -Confirm:$false");
-                else
-                    s.AddScript("Get-PnpDevice | Where-Object {$_.FriendlyName -like '*HID-konformer Touchscreen*'} | Enable-PnpDevice -Confirm:$false");
+                try
+                {
+                    PowerShell s = PowerShell.Create();
+                    if (_touchscreenEnabled)
+                        s.AddScript("Get-PnpDevice | Where-Object {$_.FriendlyName -like '*HID-konformer Touchscreen*'} | Disable-PnpDevice -Confirm:$false");
+                    else
+                        s.AddScript("Get-PnpDevice | Where-Object {$_.FriendlyName -like '*HID-konformer Touchscreen*'} | Enable-PnpDevice -Confirm:$false");
 
-                s.Invoke();
+                    s.Invoke();
 
-                s.Dispose();
-                _touchscreenEnabled = !_touchscreenEnabled;
+                    s.Dispose();
+                    _touchscreenEnabled = !_touchscreenEnabled;
+                }
+                catch(Exception ex)
+                {
+                    _logger.Log("_icon_Click() - " + ex.Message, LoggerSimple.LogLevel.Error);
+                }
             }
         }
 
@@ -111,15 +122,17 @@ namespace WPFBatteryAndTouchscreenTool
 
         private void UpdateIcon()
         {
-            int percentage = -1;
+            float percentage = -1;
             int remaining = -1;
 
             try
             {
-                ObjectQuery query = new ObjectQuery("Select EstimatedChargeRemaining, EstimatedRunTime FROM Win32_Battery");
+                PowerStatus ps = SystemInformation.PowerStatus;
+                percentage = ps.BatteryLifePercent;
+                remaining = ps.BatteryLifeRemaining;
+
+                /*ObjectQuery query = new ObjectQuery("Select EstimatedChargeRemaining, EstimatedRunTime FROM Win32_Battery");
                 ManagementObjectSearcher searcher = new ManagementObjectSearcher(query);
-
-
 
                 ManagementObjectCollection collection = searcher.Get();
                 foreach (ManagementObject mo in collection)
@@ -130,16 +143,17 @@ namespace WPFBatteryAndTouchscreenTool
 
                     break;
                 }
+                */
             }
-            catch (InvalidCastException)
+            catch (InvalidCastException ex)
             {
-                
+                _logger.Log("UpdateIcon() - " + ex.Message, LoggerSimple.LogLevel.Error);
             }
         
-            _percentage = percentage >= 0 ? percentage : 100;
+            _percentage = percentage >= 0 ? percentage * 100 : 100;
             _remaining = remaining;
             
-            Bitmap newTrayImage = PaintIcon(percentage, remaining);
+            Bitmap newTrayImage = PaintIcon((int)_percentage, remaining);
             _icon.Icon = System.Drawing.Icon.FromHandle(newTrayImage.GetHicon());
             
             //TestImage.Source = CreateBitmapSourceFromGdiBitmap(newTrayImage);
@@ -148,15 +162,21 @@ namespace WPFBatteryAndTouchscreenTool
         private Bitmap PaintIcon(int percentage, int remaining)
         {
             Bitmap icon = new Bitmap(32, 32);
-            Graphics g = Graphics.FromImage(icon);
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            g.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-            System.Drawing.Rectangle rect = new System.Drawing.Rectangle(0, 0, 32, 32);
-            g.FillRectangle(System.Drawing.Brushes.Transparent, rect);
+            try
+            {
+                Graphics g = Graphics.FromImage(icon);
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                System.Drawing.Rectangle rect = new System.Drawing.Rectangle(0, 0, 32, 32);
+                g.FillRectangle(System.Drawing.Brushes.Transparent, rect);
 
-            g.DrawString(percentage < 100 ? percentage + "" : "OK" , _font, System.Drawing.Brushes.White, rect, _format);
-
+                g.DrawString(percentage < 100 ? percentage + "" : "OK", _font, System.Drawing.Brushes.White, rect, _format);
+            }
+            catch(Exception ex)
+            {
+                _logger.Log("PaintIcon() - " + ex.Message, LoggerSimple.LogLevel.Error);
+            }
             return icon;
         }
 
@@ -191,6 +211,11 @@ namespace WPFBatteryAndTouchscreenTool
             {
                 bitmap.UnlockBits(bitmapData);
             }
+        }
+
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            _logger.Close();
         }
     }
 }
